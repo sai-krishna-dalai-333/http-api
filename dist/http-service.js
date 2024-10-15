@@ -35,6 +35,7 @@ class HttpService {
                         throw new Error(error.message || 'An error occurred');
                     }
                     const newItem = yield response.json();
+                    console.log(newItem);
                     res.writeHead(201);
                     res.end(JSON.stringify(newItem));
                 }
@@ -61,6 +62,7 @@ class HttpService {
                     throw new Error(error.message || 'An error occurred');
                 }
                 const items = yield response.json();
+                console.log(items);
                 res.writeHead(200);
                 res.end(JSON.stringify(items));
             }
@@ -86,6 +88,7 @@ class HttpService {
                     throw new Error(error.message || 'An error occurred');
                 }
                 const item = yield response.json();
+                console.log(item);
                 res.writeHead(200);
                 res.end(JSON.stringify(item));
             }
@@ -117,6 +120,7 @@ class HttpService {
                         throw new Error(error.message || 'An error occurred');
                     }
                     const updatedItem = yield response.json();
+                    console.log(updatedItem);
                     res.writeHead(200);
                     res.end(JSON.stringify(updatedItem));
                 }
