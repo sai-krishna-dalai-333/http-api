@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es6", // or "es5", depending on your needs
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist", // Output directory for compiled files
+    "rootDir": "./src" // Root directory of your source files
+  },
+  "include": ["src/**/*"], // Adjust this according to your project structure
+  "exclude": ["node_modules"]
+}
