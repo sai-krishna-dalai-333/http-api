@@ -1,114 +1,136 @@
+// http-request-handler.ts
 import * as http from 'http';
 
-export class HttpService {
-    private baseUrl: string;
+export class HttpRequestHandler<T> { 
+     private service!: T; 
 
-    constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
+     constructor(service?: T) { 
+         if (service) { 
+             this.service = service; 
+         } 
+     } 
+
+    public post(fetchMethod: keyof T, req: http.IncomingMessage, res: http.ServerResponse) { 
+        let body: string = ''; 
+
+        req.on('data', chunk => { 
+            body += chunk.toString(); // Convert Buffer to string 
+        }); 
+
+        req.on('end', async () => { 
+            try { 
+                const payload = JSON.parse(body); // Parse JSON body 
+
+                // Call create method on the provided service instance dynamically based on URL or type.
+                const createdEntity = await (this.service as any)[fetchMethod](payload); 
+
+                console.log('Created Entity:', createdEntity); 
+
+                res.writeHead(201, { 'Content-Type': 'application/json' }); 
+                res.end(JSON.stringify(createdEntity)); 
+            } catch (error: any) { 
+                console.error('Error processing request:', error);  
+                res.writeHead(500, { 'Content-Type': 'application/json' });  
+                res.end(JSON.stringify({ message: error.message }));  
+            }  
+        });  
+    }
+     
+     public get(fetchMethod: keyof T, req: http.IncomingMessage, res: http.ServerResponse) {
+        const methodName = String(fetchMethod);  
+        (this.service as any)[methodName]()
+            .then((data: any) => {
+                console.log(data);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            })
+            .catch((error: any) => {
+                console.error(`Error fetching data using ${methodName}:`, error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: error.message }));
+            });
     }
 
-    // Helper function to make HTTP requests
-    private makeRequest(method: string, endpoint: string, data?: any): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const options = {
-                hostname: 'localhost',
-                port: 3000,
-                path: `${this.baseUrl}/${endpoint}`,
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            };
-
-            const req = http.request(options, (res) => {
-                let body = '';
-
-                res.on('data', (chunk) => {
-                    body += chunk.toString(); // Convert Buffer to string
-                });
-
-                res.on('end', () => {
-                    if (typeof res.statusCode === 'number' && res.statusCode >= 200 && res.statusCode < 300) { 
-                        resolve(JSON.parse(body)); // Parse and resolve the response body
-                    } else {
-                        reject(new Error(`Error ${res.statusCode}: ${body}`));
-                    }
-                });
-            });
-
-            req.on('error', (error) => {
-                reject(error);
-            });
-
-            if (data) { 
-              req.write(JSON.stringify(data)); // Write data for POST and PUT requests
-            }
-
-            req.end(); // End the request
-        });
-    }
-
-    // POST method
-    public async post(endpoint: string, data: any): Promise<any> {
-        try {
-            console.log(`Sending POST request to ${this.baseUrl}/${endpoint} with data:`, data);
-            const result = await this.makeRequest('POST', endpoint, data);
-            console.log('POST request successful:', result);
-            return result;
-        } catch (error) {
-            console.error('Error in POST method:', error);
-            throw new Error('Internal Server Error');
+    public getById(fetchMethod: keyof T, id: number | null, req: http.IncomingMessage, res: http.ServerResponse) {
+        if (id === null) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ message: 'ID is required' }));
         }
+
+        const methodName = String(fetchMethod);
+
+        (this.service as any)[methodName](id)
+            .then((data: any) => {
+                if (data) {
+                    console.log(data);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify(data));
+                } else {
+                    // Not found case
+                    res.writeHead(404, {'Content-Type': 'application/json'});
+                    return res.end(JSON.stringify({ message: ` not found` }));
+                }
+            })
+            .catch((error:any) => {
+               console.error(`Error fetching data by ID using ${methodName}:`, error);
+               res.writeHead(500,{ 'Content-Type': 'application/json' });
+               return 	res.end(JSON.stringify({ message:error.message }));
+           });
+   }
+
+   public update(fetchMethod: keyof T, id: number | null,req: http.IncomingMessage, res: http.ServerResponse) {
+    if (id === null) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ message: "ID is required" }));
     }
 
-    // GET all method
-    public async getAll(endpoint: string): Promise<any> {
+    let body: string = '';
+
+    // Read data from request
+    req.on('data', chunk => {
+        body += chunk.toString(); // Convert Buffer to string
+    });
+
+    req.on('end', async () => {
         try {
-            console.log(`Sending GET request to ${this.baseUrl}/${endpoint}`);
-            const result = await this.makeRequest('GET', endpoint);
-            console.log('GET request successful:', result);
-            return result;
-        } catch (error) {
-           console.error('Error in GET all method:', error);
-           throw new Error('Internal Server Error');
+            const payload = JSON.parse(body); // Parse JSON body
+
+            const updatedEntity = await (this.service as any)[fetchMethod](payload);
+            
+            console.log('Updated Entity:', updatedEntity);
+            
+            if (updatedEntity) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify(updatedEntity));
+            } else {
+                // Not found case
+                res.writeHead(404,{ "Content-Type": "application/json" });
+                return 	res.end(JSON.stringify({ message:`Resource not found` }));
+           }
+       } catch (error:any) {
+           console.error(`Error updating resource using update method:`, error);
+           res.writeHead(500,{ "Content-Type": "application/json" });
+           return 	res.end(JSON.stringify({ message:error.message }));
        }
-   }
+   });
+}
 
-   // GET by ID method
-   public async getById(endpoint: string, id: string): Promise<any> { 
-       try { 
-           console.log(`Sending GET request to ${this.baseUrl}/${endpoint}/${id}`); 
-           const result = await this.makeRequest('GET', `${endpoint}/${id}`); 
-           console.log('GET by ID request successful:', result); 
-           return result; 
-       } catch (error) { 
-           console.error('Error in GET by ID method:', error); 
-           throw new Error('Internal Server Error'); 
-       } 
-   }
+public delete(fetchMethod: keyof T, id: number | null, res: http.ServerResponse) {
+    if (id === null) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ message: "ID is required" }));
+    }
 
-   // PUT method
-   public async put(endpoint: string, id: string, data: any): Promise<any> { 
-       try { 
-           console.log(`Sending PUT request to ${this.baseUrl}/${endpoint}/${id} with data:` ,data);  
-           const result = await this.makeRequest("PUT", `${endpoint}/${id}`, data);  
-           console.log("PUT request successful:",result );  
-          return result;  
-      } catch(error){   
-          console.error("Error in PUT method:", error);   
-          throw new Error("Internal Server Error");  
-      }  
-  }  
+    (this.service as any)[fetchMethod](id)
+        .then(() => {
+            res.writeHead(204); // No Content response on success
+            return res.end();
+        })
+        .catch((error:any) => {
+            console.error(`Error deleting resource using delete method:`, error);
+            res.writeHead(500,{ "Content-Type": "application/json" });
+            return 	res.end(JSON.stringify({ message:error.message }));
+        });
+}
 
-   // DELETE method
-   public async delete(endpoint:string,id:string):Promise<void>{   
-       try{     
-         console.log(`Sending DELETE request to ${this.baseUrl}/${endpoint}/${id}`);     
-         await this.makeRequest("DELETE",`${endpoint}/${id}` );    
-         console.log("DELETE request successful");    
-     }catch(error){     
-         console.error("Error in DELETE method:", error);     
-         throw new Error("Internal Server Error");    
-     }   
- }
 }
